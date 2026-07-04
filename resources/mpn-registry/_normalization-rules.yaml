@@ -1,0 +1,44 @@
+# MPN base normalization rules — consumed by the resolution stage of the
+# SPICE Model Coverage and Sanity Harness (scripts/check_spice_coverage.py).
+#
+# Purpose: turn a raw MPN as extracted from a KiCad symbol field into the
+# mpn_base used to look up resources/mpn-registry/<role>/<mpn_base>.yaml.
+# Matching against the registry is always a strict string equality on the
+# result — never fuzzy/Levenshtein matching. If normalization doesn't
+# resolve a raw MPN to an existing entry, the harness reports both raw_mpn
+# and mpn_base_normalized side by side and blocks that component
+# (blocked_missing_registry) rather than guessing.
+#
+# Algorithm (in order):
+#   1. strip() then upper()
+#   2. truncate at the first "/" (covers distributor tape/reel suffixes,
+#      e.g. "LM2596S-5.0/NOPB" -> "LM2596S-5.0")
+#   3. strip any suffix pattern listed below, longest match first
+#
+# Add a new pattern here (not a per-entry special case) when the same
+# vendor packaging/taping suffix causes repeated resolution misses.
+
+schema_version: 1
+
+strip_suffixes:
+  # Texas Instruments packaging suffixes
+  - "-NOPB"        # no Pb (RoHS), no functional difference
+  # Generic tape & reel / packaging codes
+  - "-TR"
+  - "-T1"
+  - "-T&R"
+  - "-ND"          # Digi-Key catalog suffix, not part of the real MPN
+  - "-CT-ND"
+  - "-TR-ND"
+  - "-7"           # common single-digit tape/reel/quantity code
+  - "-13"
+
+known_ambiguous_prefixes: []
+# Populate reactively: if two different real components share a common
+# prefix once suffixes are stripped (e.g. a family where the base part
+# number alone is ambiguous without a trailing variant digit that this
+# file would otherwise strip), list the prefix here with a note — this
+# forces resolution to treat it as blocked_missing_registry with an
+# "ambiguous prefix" reason instead of silently colliding two components
+# onto one registry file. Never pre-populate; add only once a real
+# collision is observed.

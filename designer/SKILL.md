@@ -161,6 +161,13 @@ Run DRC.
   analysis types the subcircuit's design guide requires (DC, AC/loop
   stability, transient, thermal, worst-case/tolerance), not a single
   generic pass — see KICAD-05.
+- **SPICE coverage check** (`kicad-spice-coverage.md`) for any
+  KICAD-05-relevant subcircuit: run `scripts/check_spice_coverage.py`
+  against its components before calling it locked. This is not
+  optional bookkeeping — a `failed` result or a non-waived
+  `blocked_*` state blocks both the lock (KICAD-04) and any
+  fabrication order (KICAD-06) until resolved (a co-written registry
+  entry/template, a fixed netlist, or an explicit, dated waiver).
 - **DRC** after every PCB layout change, if PCB is in scope.
 - Netlist/footprint consistency check (schematic and PCB in sync)
   before any export.
@@ -223,7 +230,10 @@ Simulation confidence is bounded by model fidelity: log the model's
 source and its stated validity range (temperature, load range) as
 the model confidence rating in the spec sheet's simulation table —
 treat a "simulated" result run on a generic model outside its
-validity range as evidence, not proof, per KICAD-05.
+validity range as evidence, not proof, per KICAD-05. Model
+identification and a per-component sanity check are automatable via
+`kicad-spice-coverage.md`'s MPN registry and smoke-test harness — see
+that doc before hand-authoring model bookkeeping per component.
 
 ### Model choice by phase — hard-pinned via the kicad-agents repo
 - **Architecture phase** (Step 0, Step 1, Step 1bis, ambiguity

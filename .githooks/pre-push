@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Best-effort local gate for the SPICE Model Coverage and Sanity Harness.
+# See kicad-spice-coverage.md. This hook is a convenience only: it is
+# bypassable (--no-verify, hook removal, editing this file locally) and
+# is never the authority — the GitHub Action independently re-runs the
+# same check and is the sole source of truth (see "never trust the
+# client" in kicad-spice-coverage.md).
+#
+# Installed via scripts/install-hooks.sh (this file is versioned;
+# .git/hooks/ is not, so it can't be tracked directly).
+#
+# Configure paths via environment variables if a project's layout
+# differs from the defaults below (e.g. in a shell profile or a
+# project-local .envrc) — this hook ships generic with the skill and
+# doesn't assume a specific consuming project's directory layout beyond
+# the skill's own resources/ conventions.
+
+set -uo pipefail
+
+: "${SPICE_COMPONENT_MANIFEST:=component_inventory.yaml}"
+: "${SPICE_MPN_REGISTRY:=resources/mpn-registry}"
+: "${SPICE_SMOKE_TEMPLATES:=resources/spice-smoke-templates}"
+: "${SPICE_SPEC_SHEETS:=specs}"
+: "${SPICE_WAIVERS:=spice-coverage-waivers.yaml}"
+: "${SPICE_CHECK_SCRIPT:=scripts/check_spice_coverage.py}"
+: "${SPICE_REPORT_JSON:=artifacts/spice-coverage.json}"
+: "${SPICE_REPORT_MD:=artifacts/spice-coverage.md}"
+
+if [ ! -f "$SPICE_CHECK_SCRIPT" ]; then
+  # kicad-skill itself isn't a KiCad project — nothing to check here.
+  # A consuming project that vendors/copies this skill will have the
+  # script; if not, there's nothing this hook can do.
+  exit 0
+fi
+
+if [ ! -f "$SPICE_COMPONENT_MANIFEST" ]; then
+  echo "spice-coverage pre-push: no $SPICE_COMPONENT_MANIFEST found — skipping (harness not wired up yet in this project)."
+  exit 0
+fi
+
+python3 "$SPICE_CHECK_SCRIPT" \
+  --component-manifest "$SPICE_COMPONENT_MANIFEST" \
+  --mpn-registry "$SPICE_MPN_REGISTRY" \
+  --smoke-templates "$SPICE_SMOKE_TEMPLATES" \
+  --spec-sheet "$SPICE_SPEC_SHEETS" \
+  --waivers "$SPICE_WAIVERS" \
+  --report-json "$SPICE_REPORT_JSON" \
+  --report-md "$SPICE_REPORT_MD" \
+  --mode local
+status=$?
+
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "spice-coverage: blocking issues found — see $SPICE_REPORT_MD"
+  echo "This is a best-effort local check only; the GitHub Action is the real gate."
+  echo "Push anyway (not recommended) with: git push --no-verify"
+fi
+
+exit "$status"

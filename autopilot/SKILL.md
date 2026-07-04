@@ -44,7 +44,13 @@ logged before being used.
   accessible, labeled pad, not just as a line in the spec sheet. A
   bring-up plan and a finished board are allowed to diverge
   silently otherwise, which makes the plan worthless at the moment
-  it's actually needed.
+  it's actually needed. Before Step 4 closes on any KICAD-05-relevant
+  subcircuit, the checklist also requires `scripts/check_spice_coverage.py`
+  to have been run against that subcircuit's components, with a
+  report showing no `failed` state and no non-waived `blocked_*`
+  state (see `kicad-spice-coverage.md`) — locking a subcircuit
+  without running it is not a shortcut, it is the same silent
+  divergence this invariant exists to catch.
 - **KICAD-05** — Any subcircuit with electrical risk or non-trivial
   dynamic behavior — power conversion, high current, anything
   user-touchable, protection circuits, loop-stability-dependent
@@ -66,7 +72,13 @@ logged before being used.
   result. A purely passive or low-risk subcircuit (e.g. a pull-up
   resistor, a status LED) is exempt from all analysis types, but
   this status must be explicitly justified in its spec sheet rather
-  than assumed by default.
+  than assumed by default. Per-component model identification and a
+  minimal executed sanity check (not a substitute for the analyses
+  above) are automated by `kicad-spice-coverage.md`, and running it
+  to a clean (or explicitly waived) result is mandatory — not
+  optional tooling — before a KICAD-05-relevant subcircuit can be
+  locked (KICAD-04) or fabricated (KICAD-06); its report feeds the
+  `model confidence` rating here, it does not replace it.
 - **KICAD-06** — No triggering of a fabrication or assembly order
   (submitting Gerbers/BOM/CPL to a fab/assembly house, or any
   equivalent MCP tool call that commits to a physical build) without
@@ -78,7 +90,11 @@ logged before being used.
   here, not the primary gate. A *repeat* fabrication/assembly order
   of a revision with an unresolved fail/deviation entry in
   `bringup-log.md` (KICAD-13) is blocked the same way — a known-bad
-  value must never be silently re-ordered. If `notes.md` declares
+  value must never be silently re-ordered. Any fabrication or
+  assembly order covering a KICAD-05-relevant subcircuit is likewise
+  blocked if `kicad-spice-coverage.md`'s report for that subcircuit
+  shows a `failed` state or a non-waived `blocked_*` state for any
+  of its components — see KICAD-05. If `notes.md` declares
   `intended for sale: yes` and any KICAD-14 field is unresolved (no
   RoHS status, no logged creepage/clearance intent on a mains-
   adjacent net, no isolation rating logged) for a subcircuit going
@@ -97,7 +113,11 @@ logged before being used.
   possible) and ask the user to co-write/validate it before any
   schematic generation for this category. The validated guide is
   added to the skill (so it's versioned and reusable on future
-  projects), not just to the current project.
+  projects), not just to the current project. The same reactive,
+  never-improvise discipline applies at the per-component level to
+  the MPN registry and smoke-test templates in
+  `kicad-spice-coverage.md` — an unknown component blocks only its
+  own coverage entry, not the whole subcircuit.
 - **KICAD-08** — Before any export intended for fabrication ordering
   (Gerbers/BOM/CPL, as opposed to a schematic-only prototype or
   simulation pass): ERC must be clean, DRC must be clean (if PCB is
@@ -216,6 +236,11 @@ through KICAD-14. Lists any discrepancies or inconsistencies found.
 - Before the first fabrication order for a board revision with no
   logged bring-up plan for a KICAD-05-relevant subcircuit — see
   KICAD-13
+- A KICAD-05-relevant subcircuit's `kicad-spice-coverage.md` report
+  has a `failed` state or a non-waived `blocked_*` state for any of
+  its components, or the report was never generated for that
+  subcircuit — before it is locked (KICAD-04) or before any
+  fabrication order (KICAD-06)
 - Any output about to state or imply that a design "passes,"
   "complies with," "meets," or "is certified to" a named EMC/safety/
   RoHS/isolation standard — always rewritten to logged design intent

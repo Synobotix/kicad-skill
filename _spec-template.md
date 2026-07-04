@@ -12,6 +12,24 @@
 |---|---|---|
 | <e.g. input voltage range> | <V/A/Ω/...> | <datasheet §x.y / calculation / reference design / measurement> |
 
+## SPICE resolution values (component-specific)
+<Only if at least one component in this subcircuit has
+output_adjustable: true in its registry entry (see
+resources/mpn-registry/<role>/<mpn_base>.yaml) — delete this section
+otherwise. Field names below must match resolved.* exactly (see
+resources/spice-smoke-templates/<role>.yaml's project_specific_fields
+list for the required set per role) — no translation layer. Keyed by
+component ref designator, not by role, since a subcircuit can have
+more than one adjustable-output component.>
+
+```yaml
+components:
+  <ref, e.g. U1>:
+    <field, e.g. nominal_vin>: <value>
+    <field, e.g. fb_divider_r1>: <value>
+    <field, e.g. fb_divider_r2>: <value>
+```
+
 ## Electrical constraints
 - Supply rail(s) used: <rail name(s) and voltage>
 - Current/power budget: <value or "none">

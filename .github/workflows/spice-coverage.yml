@@ -1,0 +1,83 @@
+name: SPICE coverage
+
+# Sole authority for the SPICE Model Coverage and Sanity Harness — see
+# kicad-spice-coverage.md's "never trust the client" note. This never
+# tries to verify whether a contributor's local pre-push hook ran or
+# was tampered with (that's undetectable from CI by construction); it
+# independently re-runs the same coverage check instead.
+#
+# Skips gracefully (green) on a project that hasn't wired up the
+# harness yet (no component_inventory.yaml) — including this skill's
+# own repo, which isn't itself a KiCad project.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+env:
+  SPICE_COMPONENT_MANIFEST: ${{ vars.SPICE_COMPONENT_MANIFEST || 'component_inventory.yaml' }}
+  SPICE_MPN_REGISTRY: ${{ vars.SPICE_MPN_REGISTRY || 'resources/mpn-registry' }}
+  SPICE_SMOKE_TEMPLATES: ${{ vars.SPICE_SMOKE_TEMPLATES || 'resources/spice-smoke-templates' }}
+  SPICE_SPEC_SHEETS: ${{ vars.SPICE_SPEC_SHEETS || 'specs' }}
+  SPICE_WAIVERS: ${{ vars.SPICE_WAIVERS || 'spice-coverage-waivers.yaml' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check harness is configured
+        id: check
+        run: |
+          if [ -f "$SPICE_COMPONENT_MANIFEST" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No $SPICE_COMPONENT_MANIFEST found — this project hasn't wired up the SPICE coverage harness yet, skipping."
+          fi
+
+      - name: Install ngspice
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ngspice
+          ngspice --version
+
+      - name: Set up Python
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Python dependencies
+        if: steps.check.outputs.configured == 'true'
+        run: pip install pyyaml
+
+      - name: Run SPICE coverage check
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          python3 scripts/check_spice_coverage.py \
+            --component-manifest "$SPICE_COMPONENT_MANIFEST" \
+            --mpn-registry "$SPICE_MPN_REGISTRY" \
+            --smoke-templates "$SPICE_SMOKE_TEMPLATES" \
+            --spec-sheet "$SPICE_SPEC_SHEETS" \
+            --waivers "$SPICE_WAIVERS" \
+            --report-json artifacts/spice-coverage.json \
+            --report-md artifacts/spice-coverage.md \
+            --mode ci
+
+      - name: Upload coverage report
+        if: always() && steps.check.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spice-coverage-report
+          path: artifacts/
+
+      - name: Publish coverage summary
+        if: always() && steps.check.outputs.configured == 'true'
+        run: |
+          if [ -f artifacts/spice-coverage.md ]; then
+            cat artifacts/spice-coverage.md >> "$GITHUB_STEP_SUMMARY"
+          fi
